@@ -77,8 +77,8 @@ fn sdf(p: Vec3) -> f64
     // since it only really needs to happen once per frame,
     // but I wanted to keep the code simple
     let t = unsafe { TIME };
-    let rot_x = Mat44::rotate_x(0.40 * t);
-    let rot_z = Mat44::rotate_z(0.30 * t);
+    let rot_x = Mat44::rotate_x(0.50 * t);
+    let rot_z = Mat44::rotate_z(0.35 * t);
     let rot_p = (rot_x * rot_z).transform(p);
 
     sd_torus(rot_p, 40.0, 20.0)
@@ -144,31 +144,48 @@ fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
     const MAX_STEPS: usize = 100;
     const MAX_DIST: f64 = 400.0;
 
-    // Relaxation parameter
+    // Relaxation parameter (over-relaxation factor = 1 + w)
     let w = 0.9;
 
     let mut r_m1 = 0.0;
     let mut r_i = sdf(cam_pos);
-    let mut d_i = 0.0;
+    let mut d_i = r_i;
     let mut t = 0.0;
     let mut num_steps = 0;
 
     while num_steps < MAX_STEPS && t < MAX_DIST {
-        d_i = r_i + w * r_i * (d_i - r_m1 + r_i) / (d_i + r_m1 - r_i);
+        let epsilon = (t * pixel_size_ratio).max(0.001);
+        if r_i < epsilon {
+            return t;
+        }
+
+        // Compute next step distance using over-relaxation
+        if num_steps > 0 {
+            let denom = d_i + r_m1 - r_i;
+            if denom.abs() > 1e-6 {
+                d_i = r_i * (1.0 + w * (d_i - r_m1 + r_i) / denom);
+            } else {
+                d_i = r_i;
+            }
+        } else {
+            d_i = r_i;
+        }
+
+        // Safety check to ensure we don't go backwards or get stuck
+        if d_i < 0.001 { d_i = r_i; }
 
         let mut r_p1 = sdf(cam_pos + (t + d_i) * ray_dir);
 
-        // If the unbounding spheres are disjoint, backtrack
+        // If the unbounding spheres are disjoint, backtrack to standard sphere tracing
         if d_i > r_i + r_p1
         {
             d_i = r_i;
             r_p1 = sdf(cam_pos + (t + d_i) * ray_dir);
         }
 
-        let epsilon = ((t + d_i) * pixel_size_ratio).max(0.001);
-
-        if r_p1 < epsilon {
-            break;
+        let next_epsilon = ((t + d_i) * pixel_size_ratio).max(0.001);
+        if r_p1 < next_epsilon {
+            return t + d_i;
         }
 
         t += d_i;
@@ -178,11 +195,11 @@ fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
         r_i = r_p1;
     }
 
-    if num_steps == MAX_STEPS || t > MAX_DIST {
+    if t > MAX_DIST {
         return INFINITY;
     }
 
-    return t;
+    return if r_i < (t * pixel_size_ratio).max(0.001) { t } else { INFINITY };
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
