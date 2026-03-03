@@ -94,8 +94,14 @@ fn main()
     let mut rot_x = 0.0;
     let mut render_method = RenderMethod::Standard;
 
+    let mut last_time = std::time::Instant::now();
+
     loop
     {
+        let current_time = std::time::Instant::now();
+        let dt = current_time.duration_since(last_time).as_secs_f64();
+        last_time = current_time;
+
         // See: https://docs.rs/sdl2/0.30.0/sdl2/event/enum.Event.htmls
         match event_pump.poll_event() {
             Some(Event::Quit { .. }) => {
@@ -133,6 +139,7 @@ fn main()
             rot_z,
             rot_x,
             60.0,
+            dt,
             render_method,
         );
 

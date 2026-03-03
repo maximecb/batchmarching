@@ -77,8 +77,8 @@ fn sdf(p: Vec3) -> f64
     // since it only really needs to happen once per frame,
     // but I wanted to keep the code simple
     let t = unsafe { TIME };
-    let rot_x = Mat44::rotate_x(0.20 * t);
-    let rot_z = Mat44::rotate_z(0.15 * t);
+    let rot_x = Mat44::rotate_x(0.40 * t);
+    let rot_z = Mat44::rotate_z(0.30 * t);
     let rot_p = (rot_x * rot_z).transform(p);
 
     sd_torus(rot_p, 40.0, 20.0)
@@ -309,6 +309,7 @@ pub fn render_scene(
     rot_z: f64,
     rot_x: f64,
     fov_x: f64,
+    dt: f64,
     method: RenderMethod,
 )
 {
@@ -344,7 +345,7 @@ pub fn render_scene(
     let top_left = (cam_pos + forward) - (half_w * right) + (half_h * up);
 
     unsafe { EVAL_COUNT = 0 };
-    unsafe { TIME += 0.1 };
+    unsafe { TIME += dt };
 
     match method {
         RenderMethod::Batch => {
@@ -385,7 +386,7 @@ pub fn render_scene(
     let end_time = SystemTime::now();
     let dt = end_time.duration_since(start_time).unwrap().as_millis();
     let fps = 1.0 / ((dt as f64) / 1000.0);
-    println!("Render time: {} ms, FPS: {:.1} ({:?})", dt, fps, method);
+    println!("Render time: {} ms, FPS: {:.1} ({:?} ray marching)", dt, fps, method);
 
     let evals_per_pix = unsafe { EVAL_COUNT as f64 } / (frame.height * frame.width) as f64;
     println!("SDF evals/pixel : {:.2}", evals_per_pix);
