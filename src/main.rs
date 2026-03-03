@@ -90,6 +90,9 @@ fn main()
 
     let mut event_pump = sdl.event_pump().unwrap();
 
+    let mut rot_z = 0.0;
+    let mut rot_x = 0.0;
+
     loop
     {
         // See: https://docs.rs/sdl2/0.30.0/sdl2/event/enum.Event.htmls
@@ -114,8 +117,8 @@ fn main()
         render_scene(
             &mut fb,
             200.0,
-            0.0,
-            0.0,
+            rot_z,
+            rot_x,
             60.0,
         );
 

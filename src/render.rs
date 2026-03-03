@@ -71,12 +71,7 @@ fn sd_torus(p: Vec3, tx: f64, ty: f64) -> f64
 fn sdf(p: Vec3) -> f64
 {
     unsafe { EVAL_COUNT += 1 };
-
-
     sd_torus(p, 40.0, 20.0)
-
-
-
 }
 
 // Estimate the surface normal with 4 SDF evaluations. Based
@@ -292,7 +287,7 @@ fn render_rect(
                 let normal = calc_normal(p);
                 let dot = normal.dot(light_dir);
                 let cos_theta = if dot < 0.0 { -dot } else { 0.0 };
-                let brightness = 0.35 + cos_theta;
+                let brightness = (0.20 + cos_theta).min(1.0);
                 frame.set_pixel(x, y, brightness, 0.0, 0.0);
                 return;
             }
