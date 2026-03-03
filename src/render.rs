@@ -1,5 +1,5 @@
 use std::time::SystemTime;
-use std::f64::INFINITY;
+use std::f32::INFINITY;
 use crate::math::*;
 
 pub struct Image
@@ -11,7 +11,7 @@ pub struct Image
     data: Vec<u32>,
 }
 
-pub fn rgb32(r: f64, g: f64, b: f64) -> u32
+pub fn rgb32(r: f32, g: f32, b: f32) -> u32
 {
     let r = ((r.min(1.0) * 255.0) as u32) & 255;
     let g = ((g.min(1.0) * 255.0) as u32) & 255;
@@ -38,13 +38,13 @@ impl Image
         self.width
     }
 
-    pub fn clear(&mut self, r: f64, g: f64, b: f64)
+    pub fn clear(&mut self, r: f32, g: f32, b: f32)
     {
         let color = rgb32(r, g, b);
         self.data.fill(color);
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize, r: f64, g: f64, b: f64)
+    pub fn set_pixel(&mut self, x: usize, y: usize, r: f32, g: f32, b: f32)
     {
         assert!(x < self.width);
         assert!(y < self.height);
@@ -61,15 +61,15 @@ impl Image
 }
 
 static mut EVAL_COUNT: u64 = 0;
-static mut TIME: f64 = 0.0;
+static mut TIME: f32 = 0.0;
 
-fn sd_torus(p: Vec3, tx: f64, ty: f64) -> f64
+fn sd_torus(p: Vec3, tx: f32, ty: f32) -> f32
 {
-    let qx: f64 = (p.x * p.x + p.z * p.z).sqrt() - tx;
+    let qx: f32 = (p.x * p.x + p.z * p.z).sqrt() - tx;
     return (qx*qx + p.y * p.y).sqrt() - ty;
 }
 
-fn sdf(p: Vec3) -> f64
+fn sdf(p: Vec3) -> f32
 {
     unsafe { EVAL_COUNT += 1 };
 
@@ -89,7 +89,7 @@ fn sdf(p: Vec3) -> f64
 // https://iquilezles.org/articles/normalsSDF/
 fn calc_normal(p: Vec3) -> Vec3
 {
-    let h = 0.000001;
+    let h = 0.001;
     let xyy = Vec3::new( 1.0, -1.0, -1.0);
     let yyx = Vec3::new(-1.0, -1.0,  1.0);
     let yxy = Vec3::new(-1.0,  1.0, -1.0);
@@ -105,10 +105,10 @@ fn calc_normal(p: Vec3) -> Vec3
 
 // Returns a distance value
 // Infinity if no intersection
-fn march_ray(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
+fn march_ray(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f32) -> f32
 {
     const MAX_STEPS: usize = 100;
-    const MAX_DIST: f64 = 400.0;
+    const MAX_DIST: f32 = 400.0;
 
     let mut t = 0.0;
     let mut num_steps = 0;
@@ -139,10 +139,10 @@ fn march_ray(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
 // Returns a distance value
 // Infinity if no intersection
 // Accelerated sphere tracing algorithm (Balint & Valasek 2018)
-fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
+fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f32) -> f32
 {
     const MAX_STEPS: usize = 100;
-    const MAX_DIST: f64 = 400.0;
+    const MAX_DIST: f32 = 400.0;
 
     // Relaxation parameter (over-relaxation factor = 1 + w)
     let w = 0.9;
@@ -216,7 +216,7 @@ fn shade_pixel(
     y: usize,
     cam_pos: Vec3,
     ray_dir: Vec3,
-    t: f64,
+    t: f32,
 ) {
     if t == INFINITY {
         return;
@@ -236,36 +236,36 @@ fn render_rect(
     top_left: Vec3,
     right: Vec3,
     up: Vec3,
-    pixel_size_ratio: f64,
-    half_w: f64,
-    half_h: f64,
+    pixel_size_ratio: f32,
+    half_w: f32,
+    half_h: f32,
     x: usize,
     y: usize,
     w: usize,
     h: usize,
-    mut t: f64,
+    mut t: f32,
 ) {
-    const MAX_DIST: f64 = 400.0;
+    const MAX_DIST: f32 = 400.0;
     const MAX_STEPS: usize = 100;
-    const EPSILON_BASE: f64 = 0.001;
+    const EPSILON_BASE: f32 = 0.001;
 
     if t > MAX_DIST {
         return;
     }
 
     // Center of this rect in pixel coordinates
-    let cx = x as f64 + w as f64 / 2.0;
-    let cy = y as f64 + h as f64 / 2.0;
+    let cx = x as f32 + w as f32 / 2.0;
+    let cy = y as f32 + h as f32 / 2.0;
 
     // Ray direction for the center
-    let x_ratio = cx / (frame.width as f64);
-    let y_ratio = cy / (frame.height as f64);
+    let x_ratio = cx / (frame.width as f32);
+    let y_ratio = cy / (frame.height as f32);
     let pix_pos = top_left + (2.0 * half_w) * x_ratio * right + (2.0 * half_h) * y_ratio * -up;
     let ray_dir = (pix_pos - cam_pos).normalized();
 
     // Spread: max distance from center ray to any point in the quad at distance 1.0
-    let dx = w as f64 / 2.0;
-    let dy = h as f64 / 2.0;
+    let dx = w as f32 / 2.0;
+    let dy = h as f32 / 2.0;
     let dr = (dx*dx + dy*dy).sqrt();
     let spread = dr * pixel_size_ratio;
 
@@ -322,11 +322,11 @@ fn render_rect(
 
 pub fn render_scene(
     frame: &mut Image,
-    cam_dist: f64,
-    rot_z: f64,
-    rot_x: f64,
-    fov_x: f64,
-    dt: f64,
+    cam_dist: f32,
+    rot_z: f32,
+    rot_x: f32,
+    fov_x: f32,
+    dt: f32,
     method: RenderMethod,
 )
 {
@@ -354,9 +354,9 @@ pub fn render_scene(
     // Half of the image frame width
     // With the image plane being one unit away
     let half_w = deg2rad(fov_x / 2.0).tan();
-    let half_h = half_w * (frame.height as f64) / (frame.width as f64);
+    let half_h = half_w * (frame.height as f32) / (frame.width as f32);
 
-    let pixel_size_ratio = (2.0 * half_w) / (frame.width as f64);
+    let pixel_size_ratio = (2.0 * half_w) / (frame.width as f32);
 
     // Compute the position of the top-left corner of the image plane
     let top_left = (cam_pos + forward) - (half_w * right) + (half_h * up);
@@ -383,8 +383,8 @@ pub fn render_scene(
         RenderMethod::Standard | RenderMethod::Accelerated => {
             for y in 0..frame.height {
                 for x in 0..frame.width {
-                    let x_ratio = (x as f64 + 0.5) / (frame.width as f64);
-                    let y_ratio = (y as f64 + 0.5) / (frame.height as f64);
+                    let x_ratio = (x as f32 + 0.5) / (frame.width as f32);
+                    let y_ratio = (y as f32 + 0.5) / (frame.height as f32);
                     let pix_pos = top_left + (2.0 * half_w) * x_ratio * right + (2.0 * half_h) * y_ratio * -up;
                     let ray_dir = (pix_pos - cam_pos).normalized();
 
@@ -402,10 +402,10 @@ pub fn render_scene(
 
     let end_time = SystemTime::now();
     let dt = end_time.duration_since(start_time).unwrap().as_millis();
-    let fps = 1.0 / ((dt as f64) / 1000.0);
+    let fps = 1.0 / ((dt as f32) / 1000.0);
     println!("Render time: {} ms, FPS: {:.1} ({:?} ray marching)", dt, fps, method);
 
-    let evals_per_pix = unsafe { EVAL_COUNT as f64 } / (frame.height * frame.width) as f64;
+    let evals_per_pix = unsafe { EVAL_COUNT as f32 } / (frame.height * frame.width) as f32;
     println!("SDF evals/pixel : {:.2}", evals_per_pix);
 }
 

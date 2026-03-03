@@ -99,7 +99,7 @@ fn main()
     loop
     {
         let current_time = std::time::Instant::now();
-        let dt = current_time.duration_since(last_time).as_secs_f64();
+        let dt = current_time.duration_since(last_time).as_secs_f32();
         last_time = current_time;
 
         // See: https://docs.rs/sdl2/0.30.0/sdl2/event/enum.Event.htmls
