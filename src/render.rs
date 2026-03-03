@@ -61,6 +61,7 @@ impl Image
 }
 
 static mut EVAL_COUNT: u64 = 0;
+static mut TIME: f64 = 0.0;
 
 fn sd_torus(p: Vec3, tx: f64, ty: f64) -> f64
 {
@@ -71,7 +72,16 @@ fn sd_torus(p: Vec3, tx: f64, ty: f64) -> f64
 fn sdf(p: Vec3) -> f64
 {
     unsafe { EVAL_COUNT += 1 };
-    sd_torus(p, 40.0, 20.0)
+
+    // Generating rotation matrices here is inefficient
+    // since it only really needs to happen once per frame,
+    // but I wanted to keep the code simple
+    let t = unsafe { TIME };
+    let rot_x = Mat44::rotate_x(0.20 * t);
+    let rot_z = Mat44::rotate_z(0.15 * t);
+    let rot_p = (rot_x * rot_z).transform(p);
+
+    sd_torus(rot_p, 40.0, 20.0)
 }
 
 // Estimate the surface normal with 4 SDF evaluations. Based
@@ -148,10 +158,7 @@ pub fn estimate_bounds(vm: &mut VM, sdf_fn: Value) -> (Vec3, Vec3)
 fn march_ray(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
 {
     const MAX_STEPS: usize = 100;
-
-    // 2,500 mm (2.5m)
-    // TODO: adjust dynamically based on object size
-    const MAX_DIST: f64 = 2500.0;
+    const MAX_DIST: f64 = 400.0;
 
     let mut t = 0.0;
     let mut num_steps = 0;
@@ -185,10 +192,7 @@ fn march_ray(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
 fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
 {
     const MAX_STEPS: usize = 100;
-
-    // 2,500 mm (2.5m)
-    // TODO: adjust dynamically based on object size
-    const MAX_DIST: f64 = 2500.0;
+    const MAX_DIST: f64 = 400.0;
 
     // Relaxation parameter
     let w = 0.9;
@@ -246,8 +250,8 @@ fn render_rect(
     h: usize,
     mut t: f64,
 ) {
-    const MAX_DIST: f64 = 2500.0;
-    const MAX_STEPS: usize = 150;
+    const MAX_DIST: f64 = 400.0;
+    const MAX_STEPS: usize = 100;
     const EPSILON_BASE: f64 = 0.001;
 
     if t > MAX_DIST {
@@ -367,6 +371,7 @@ pub fn render_scene(
     let top_left = (cam_pos + forward) - (half_w * right) + (half_h * up);
 
     unsafe { EVAL_COUNT = 0 };
+    unsafe { TIME += 0.1 };
 
     render_rect(
         frame,
@@ -384,8 +389,8 @@ pub fn render_scene(
 
     let end_time = SystemTime::now();
     let dt = end_time.duration_since(start_time).unwrap().as_millis();
-    println!("render time: {} ms", dt);
+    println!("Render time: {} ms", dt);
 
     let evals_per_pix = unsafe { EVAL_COUNT as f64 } / (frame.height * frame.width) as f64;
-    println!("evals/pixel : {:.2}", evals_per_pix);
+    println!("SDF evals/pixel : {:.2}", evals_per_pix);
 }
