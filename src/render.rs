@@ -148,7 +148,7 @@ fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
     let w = 0.9;
 
     let mut r_m1 = 0.0;
-    let mut r_i = 0.0;
+    let mut r_i = sdf(cam_pos);
     let mut d_i = 0.0;
     let mut t = 0.0;
     let mut num_steps = 0;
