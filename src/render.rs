@@ -103,56 +103,6 @@ fn calc_normal(p: Vec3) -> Vec3
     ).normalized();
 }
 
-/*
-// Estimate the extents of the object represented by an SDF
-// NOTE: if we just want a bounding sphere, then we should
-// sample random points close to the sphere edge
-// Take a random vector and normalize it.
-pub fn estimate_bounds(vm: &mut VM, sdf_fn: Value) -> (Vec3, Vec3)
-{
-    use rand::{thread_rng};
-    use rand_distr::{Normal, Distribution};
-
-    let mut min = Vec3::default();
-    let mut max = Vec3::default();
-
-    let mut num_samples: usize = 0;
-
-    while (num_samples < 50_000)
-    {
-        let norm = (max - min).norm();
-        let gaussian = Normal::new(0.0, norm / 2.0 + 0.01).unwrap();
-
-        let mut pos = Vec3::new(
-            gaussian.sample(&mut rand::thread_rng()),
-            gaussian.sample(&mut rand::thread_rng()),
-            gaussian.sample(&mut rand::thread_rng()),
-        );
-
-        let d = vm.call_sdf(sdf_fn, pos);
-
-        if d < 0.0
-        {
-            let new_min = min.min(pos);
-            let new_max = max.max(pos);
-
-            if new_min != min || new_max != max {
-                min = new_min;
-                max = new_max;
-
-                println!("itr #{}", num_samples);
-                println!("min {:?}", min);
-                println!("max {:?}", max);
-            }
-        }
-
-        num_samples += 1;
-    }
-
-    return (min, max);
-}
-*/
-
 // Returns a distance value
 // Infinity if no intersection
 fn march_ray(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
@@ -235,6 +185,34 @@ fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f64) -> f64
     return t;
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum RenderMethod
+{
+    Standard,
+    Accelerated,
+    Batch,
+}
+
+fn shade_pixel(
+    frame: &mut Image,
+    x: usize,
+    y: usize,
+    cam_pos: Vec3,
+    ray_dir: Vec3,
+    t: f64,
+) {
+    if t == INFINITY {
+        return;
+    }
+    let p = cam_pos + ray_dir * t;
+    let light_dir: Vec3 = Vec3::new(1.0, 1.3, -1.0).normalized();
+    let normal = calc_normal(p);
+    let dot = normal.dot(light_dir);
+    let cos_theta = if dot < 0.0 { -dot } else { 0.0 };
+    let brightness = (0.20 + cos_theta).min(1.0);
+    frame.set_pixel(x, y, brightness, 0.0, 0.0);
+}
+
 fn render_rect(
     frame: &mut Image,
     cam_pos: Vec3,
@@ -286,13 +264,7 @@ fn render_rect(
             let epsilon = (t * epsilon_ratio).max(EPSILON_BASE);
 
             if d < epsilon {
-                // Hit!
-                let light_dir: Vec3 = Vec3::new(1.0, 1.3, -1.0).normalized();
-                let normal = calc_normal(p);
-                let dot = normal.dot(light_dir);
-                let cos_theta = if dot < 0.0 { -dot } else { 0.0 };
-                let brightness = (0.20 + cos_theta).min(1.0);
-                frame.set_pixel(x, y, brightness, 0.0, 0.0);
+                shade_pixel(frame, x, y, cam_pos, ray_dir, t);
                 return;
             }
 
@@ -337,6 +309,7 @@ pub fn render_scene(
     rot_z: f64,
     rot_x: f64,
     fov_x: f64,
+    method: RenderMethod,
 )
 {
     let start_time = SystemTime::now();
@@ -373,24 +346,48 @@ pub fn render_scene(
     unsafe { EVAL_COUNT = 0 };
     unsafe { TIME += 0.1 };
 
-    render_rect(
-        frame,
-        cam_pos,
-        top_left,
-        right,
-        up,
-        pixel_size_ratio,
-        half_w,
-        half_h,
-        0, 0,
-        frame.width, frame.height,
-        0.0
-    );
+    match method {
+        RenderMethod::Batch => {
+            render_rect(
+                frame,
+                cam_pos,
+                top_left,
+                right,
+                up,
+                pixel_size_ratio,
+                half_w,
+                half_h,
+                0, 0,
+                frame.width, frame.height,
+                0.0
+            );
+        }
+        RenderMethod::Standard | RenderMethod::Accelerated => {
+            for y in 0..frame.height {
+                for x in 0..frame.width {
+                    let x_ratio = (x as f64 + 0.5) / (frame.width as f64);
+                    let y_ratio = (y as f64 + 0.5) / (frame.height as f64);
+                    let pix_pos = top_left + (2.0 * half_w) * x_ratio * right + (2.0 * half_h) * y_ratio * -up;
+                    let ray_dir = (pix_pos - cam_pos).normalized();
+
+                    let t = match method {
+                        RenderMethod::Standard => march_ray(cam_pos, ray_dir, pixel_size_ratio),
+                        RenderMethod::Accelerated => march_ray_accel(cam_pos, ray_dir, pixel_size_ratio),
+                        _ => unreachable!(),
+                    };
+
+                    shade_pixel(frame, x, y, cam_pos, ray_dir, t);
+                }
+            }
+        }
+    }
 
     let end_time = SystemTime::now();
     let dt = end_time.duration_since(start_time).unwrap().as_millis();
-    println!("Render time: {} ms", dt);
+    let fps = 1.0 / ((dt as f64) / 1000.0);
+    println!("Render time: {} ms, FPS: {:.1} ({:?})", dt, fps, method);
 
     let evals_per_pix = unsafe { EVAL_COUNT as f64 } / (frame.height * frame.width) as f64;
     println!("SDF evals/pixel : {:.2}", evals_per_pix);
 }
+

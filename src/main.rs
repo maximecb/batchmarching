@@ -92,6 +92,7 @@ fn main()
 
     let mut rot_z = 0.0;
     let mut rot_x = 0.0;
+    let mut render_method = RenderMethod::Standard;
 
     loop
     {
@@ -107,6 +108,18 @@ fn main()
                         break
                     }
 
+                    Keycode::Num1 => {
+                        render_method = RenderMethod::Standard;
+                    }
+
+                    Keycode::Num2 => {
+                        render_method = RenderMethod::Accelerated;
+                    }
+
+                    Keycode::Num3 => {
+                        render_method = RenderMethod::Batch;
+                    }
+
                     _ => {}
                 }
             }
@@ -120,6 +133,7 @@ fn main()
             rot_z,
             rot_x,
             60.0,
+            render_method,
         );
 
         show_frame(
