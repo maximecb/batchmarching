@@ -62,21 +62,22 @@ impl Image
 
 static mut EVAL_COUNT: u64 = 0;
 
+fn sd_torus(p: Vec3, tx: f64, ty: f64) -> f64
+{
+    let qx: f64 = (p.x * p.x + p.z * p.z).sqrt() - tx;
+    return (qx*qx + p.y * p.y).sqrt() - ty;
+}
+
 fn sdf(p: Vec3) -> f64
 {
     unsafe { EVAL_COUNT += 1 };
 
 
+    sd_torus(p, 40.0, 20.0)
 
 
 
-
-    0.0
 }
-
-
-
-
 
 // Estimate the surface normal with 4 SDF evaluations. Based
 // on an article by the legendary Inigo Quilez:

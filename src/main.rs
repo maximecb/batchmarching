@@ -8,7 +8,7 @@ mod math;
 mod render;
 use sdl2::pixels::Color;
 use sdl2::event::Event;
-//use sdl2::keyboard::Keycode;
+use sdl2::keyboard::Keycode;
 use sdl2::render::Texture;
 use sdl2::render::TextureAccess;
 use sdl2::pixels::PixelFormatEnum;
@@ -88,21 +88,35 @@ fn main()
         window_height as usize,
     );
 
-    let mut rot_z = 20.0;
-    let mut rot_x = -20.0;
-    let mut cam_dist = 200.0;
+    let mut event_pump = sdl.event_pump().unwrap();
 
+    loop
+    {
+        // See: https://docs.rs/sdl2/0.30.0/sdl2/event/enum.Event.htmls
+        match event_pump.poll_event() {
+            Some(Event::Quit { .. }) => {
+                break;
+            }
 
+            Some(Event::KeyDown { window_id, keycode: Some(keycode), .. }) => {
+                match keycode {
+                    Keycode::Escape => {
+                        break
+                    }
 
-    /*
-    let mut redraw = |cam_dist, rot_z, rot_x| {
+                    _ => {}
+                }
+            }
+
+            _ => {}
+        }
+
         render_scene(
             &mut fb,
-            cam_dist,
-            rot_z,
-            rot_x,
+            200.0,
+            0.0,
+            0.0,
             60.0,
-            vm,
         );
 
         show_frame(
@@ -110,31 +124,5 @@ fn main()
             &mut texture,
             &fb,
         );
-    };
-
-    redraw(cam_dist, rot_z, rot_x);
-    */
-
-    let mut event_pump = sdl.event_pump().unwrap();
-
-
-
-    loop
-    {
-        // See: https://docs.rs/sdl2/0.30.0/sdl2/event/enum.Event.html
-        let event = event_pump.wait_event();
-
-        match event {
-            Event::Quit { .. } => {
-                break;
-            }
-            _ => {}
-        }
-
-
-
-
     }
-
-
 }
