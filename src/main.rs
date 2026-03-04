@@ -126,6 +126,10 @@ fn main()
                         render_method = RenderMethod::Batch;
                     }
 
+                    Keycode::Num4 => {
+                        render_method = RenderMethod::Approx;
+                    }
+
                     _ => {}
                 }
             }

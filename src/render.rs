@@ -208,6 +208,7 @@ pub enum RenderMethod
     Standard,
     Accelerated,
     Batch,
+    Approx,
 }
 
 fn shade_pixel(
@@ -306,6 +307,7 @@ fn render_rect(
             num_steps += 1;
         } else {
             // Too close, must recurse
+
             let w1 = w / 2;
             let w2 = w - w1;
             let h1 = h / 2;
@@ -315,6 +317,141 @@ fn render_rect(
             if w2 > 0 && h1 > 0 { render_rect(frame, cam_pos, top_left, right, up, pixel_size_ratio, half_w, half_h, x + w1, y, w2, h1, t); }
             if w1 > 0 && h2 > 0 { render_rect(frame, cam_pos, top_left, right, up, pixel_size_ratio, half_w, half_h, x, y + h1, w1, h2, t); }
             if w2 > 0 && h2 > 0 { render_rect(frame, cam_pos, top_left, right, up, pixel_size_ratio, half_w, half_h, x + w1, y + h1, w2, h2, t); }
+            return;
+        }
+    }
+}
+
+fn render_rect_approx(
+    frame: &mut Image,
+    cam_pos: Vec3,
+    top_left: Vec3,
+    right: Vec3,
+    up: Vec3,
+    pixel_size_ratio: f32,
+    half_w: f32,
+    half_h: f32,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    mut t: f32,
+) {
+    const MAX_DIST: f32 = 400.0;
+    const MAX_STEPS: usize = 100;
+    const EPSILON_BASE: f32 = 0.001;
+
+    if t > MAX_DIST {
+        return;
+    }
+
+    // Center of this rect in pixel coordinates
+    let cx = x as f32 + w as f32 / 2.0;
+    let cy = y as f32 + h as f32 / 2.0;
+
+    // Ray direction for the center
+    let x_ratio = cx / (frame.width as f32);
+    let y_ratio = cy / (frame.height as f32);
+    let pix_pos = top_left + (2.0 * half_w) * x_ratio * right + (2.0 * half_h) * y_ratio * -up;
+    let ray_dir = (pix_pos - cam_pos).normalized();
+
+    // Spread: max distance from center ray to any point in the quad at distance 1.0
+    let dx = w as f32 / 2.0;
+    let dy = h as f32 / 2.0;
+    let dr = (dx*dx + dy*dy).sqrt();
+    let spread = dr * pixel_size_ratio;
+
+    if w == 1 && h == 1 {
+        // Single pixel - march until hit or max dist
+        let mut num_steps = 0;
+        let epsilon_ratio = 0.5 * 1.414 * pixel_size_ratio;
+
+        while num_steps < MAX_STEPS && t < MAX_DIST {
+            let p = cam_pos + ray_dir * t;
+            let d = sdf(p);
+
+            let epsilon = (t * epsilon_ratio).max(EPSILON_BASE);
+
+            if d < epsilon {
+                shade_pixel(frame, x, y, cam_pos, ray_dir, t);
+                return;
+            }
+
+            t += d;
+            num_steps += 1;
+        }
+        return;
+    }
+
+    let mut num_steps = 0;
+    while num_steps < MAX_STEPS && t < MAX_DIST {
+        let p = cam_pos + ray_dir * t;
+        let d = sdf(p);
+
+        let radius = t * spread;
+        let epsilon = (t * pixel_size_ratio).max(EPSILON_BASE);
+
+        if d > radius + epsilon {
+            // Safe to advance the whole quad
+            let dt = (d - radius) / (1.0 + spread);
+            t += dt.max(epsilon);
+            num_steps += 1;
+        } else {
+            // Too close, must recurse
+            if w <= 10 && h <= 10 {
+                let t_test = t + d + 3.0 * radius;
+                let p_test = cam_pos + ray_dir * t_test;
+                let d_test = sdf(p_test);
+                let radius_test = t_test * spread;
+
+                if d_test < -radius_test {
+                    // The whole quad is inside the object. Shade it all at once.
+                    // Interpolate between the 4 corners
+                    let get_brightness = |ix: usize, iy: usize| {
+                        let cx = ix as f32 + 0.5;
+                        let cy = iy as f32 + 0.5;
+                        let x_ratio = cx / (frame.width as f32);
+                        let y_ratio = cy / (frame.height as f32);
+                        let pix_pos = top_left + (2.0 * half_w) * x_ratio * right + (2.0 * half_h) * y_ratio * -up;
+                        let r_dir = (pix_pos - cam_pos).normalized();
+                        let p = cam_pos + r_dir * (t + d);
+                        let light_dir: Vec3 = Vec3::new(1.0, 1.3, -1.0).normalized();
+                        let normal = calc_normal(p);
+                        let dot = normal.dot(light_dir);
+                        let cos_theta = if dot < 0.0 { -dot } else { 0.0 };
+                        (0.20 + cos_theta).min(1.0)
+                    };
+
+                    let b00 = get_brightness(x, y);
+                    let b10 = get_brightness(x + w - 1, y);
+                    let b01 = get_brightness(x, y + h - 1);
+                    let b11 = get_brightness(x + w - 1, y + h - 1);
+
+                    for iy in y..y+h {
+                        let v = (iy - y) as f32 / (h as f32).max(1.0);
+                        let offset = iy * frame.width;
+                        for ix in x..x+w {
+                            let u = (ix - x) as f32 / (w as f32).max(1.0);
+                            let brightness = b00 * (1.0 - u) * (1.0 - v) +
+                                             b10 * u * (1.0 - v) +
+                                             b01 * (1.0 - u) * v +
+                                             b11 * u * v;
+                            frame.data[offset + ix] = rgb32(brightness, 0.0, 0.0);
+                        }
+                    }
+                    return;
+                }
+            }
+
+            let w1 = w / 2;
+            let w2 = w - w1;
+            let h1 = h / 2;
+            let h2 = h - h1;
+
+            if w1 > 0 && h1 > 0 { render_rect_approx(frame, cam_pos, top_left, right, up, pixel_size_ratio, half_w, half_h, x, y, w1, h1, t); }
+            if w2 > 0 && h1 > 0 { render_rect_approx(frame, cam_pos, top_left, right, up, pixel_size_ratio, half_w, half_h, x + w1, y, w2, h1, t); }
+            if w1 > 0 && h2 > 0 { render_rect_approx(frame, cam_pos, top_left, right, up, pixel_size_ratio, half_w, half_h, x, y + h1, w1, h2, t); }
+            if w2 > 0 && h2 > 0 { render_rect_approx(frame, cam_pos, top_left, right, up, pixel_size_ratio, half_w, half_h, x + w1, y + h1, w2, h2, t); }
             return;
         }
     }
@@ -380,6 +517,23 @@ pub fn render_scene(
                 0.0
             );
         }
+
+        RenderMethod::Approx => {
+            render_rect_approx(
+                frame,
+                cam_pos,
+                top_left,
+                right,
+                up,
+                pixel_size_ratio,
+                half_w,
+                half_h,
+                0, 0,
+                frame.width, frame.height,
+                0.0
+            );
+        }
+
         RenderMethod::Standard | RenderMethod::Accelerated => {
             for y in 0..frame.height {
                 for x in 0..frame.width {
