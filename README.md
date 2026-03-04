@@ -1,9 +1,10 @@
 # Adaptive Ray Batch Marching (ARBM)
 
+## Running the Demo
 
-
-
-
+```
+cargo run --release
+```
 
 ## Build Instructions
 
