@@ -427,41 +427,51 @@ fn render_rect_approx(
                 let radius_test = t_test * spread;
 
                 if d_test < -radius_test {
-                    // The whole quad is inside the object. Shade it all at once.
-                    // Interpolate between the 4 corners
-                    let get_brightness = |ix: usize, iy: usize| {
-                        let cx = ix as f32 + 0.5;
-                        let cy = iy as f32 + 0.5;
-                        let x_ratio = cx / (frame.width as f32);
-                        let y_ratio = cy / (frame.height as f32);
-                        let pix_pos = top_left + (2.0 * half_w) * x_ratio * right + (2.0 * half_h) * y_ratio * -up;
-                        let r_dir = (pix_pos - cam_pos).normalized();
-                        let p = cam_pos + r_dir * (t + d);
-                        let light_dir: Vec3 = Vec3::new(1.0, 1.3, -1.0).normalized();
-                        let normal = calc_normal(p);
-                        let dot = normal.dot(light_dir);
-                        let cos_theta = if dot < 0.0 { -dot } else { 0.0 };
-                        (0.20 + cos_theta).min(1.0)
-                    };
+                    // The whole quad is inside the object.
+                    // Now check if the surface is "flat" enough by comparing normals at the corners.
+                    macro_rules! get_info {
+                        ($ix:expr, $iy:expr) => {{
+                            let cx = $ix as f32 + 0.5;
+                            let cy = $iy as f32 + 0.5;
+                            let x_ratio = cx / (frame.width as f32);
+                            let y_ratio = cy / (frame.height as f32);
+                            let pix_pos = top_left + (2.0 * half_w) * x_ratio * right + (2.0 * half_h) * y_ratio * -up;
+                            let r_dir = (pix_pos - cam_pos).normalized();
+                            let p = cam_pos + r_dir * (t + d);
+                            let normal = calc_normal(p);
 
-                    let b00 = get_brightness(x, y);
-                    let b10 = get_brightness(x + w - 1, y);
-                    let b01 = get_brightness(x, y + h - 1);
-                    let b11 = get_brightness(x + w - 1, y + h - 1);
+                            let light_dir: Vec3 = Vec3::new(1.0, 1.3, -1.0).normalized();
+                            let dot = normal.dot(light_dir);
+                            let cos_theta = if dot < 0.0 { -dot } else { 0.0 };
+                            let brightness = (0.20 + cos_theta).min(1.0);
 
-                    for iy in y..y+h {
-                        let v = (iy - y) as f32 / (h as f32).max(1.0);
-                        let offset = iy * frame.width;
-                        for ix in x..x+w {
-                            let u = (ix - x) as f32 / (w as f32).max(1.0);
-                            let brightness = b00 * (1.0 - u) * (1.0 - v) +
-                                             b10 * u * (1.0 - v) +
-                                             b01 * (1.0 - u) * v +
-                                             b11 * u * v;
-                            frame.data[offset + ix] = rgb32(brightness, 0.0, 0.0);
-                        }
+                            (normal, brightness)
+                        }};
                     }
-                    return;
+
+                    let (n00, b00) = get_info!(x, y);
+                    let (n10, b10) = get_info!(x + w - 1, y);
+                    let (n01, b01) = get_info!(x, y + h - 1);
+                    let (n11, b11) = get_info!(x + w - 1, y + h - 1);
+
+                    let threshold = 0.75;
+                    if n00.dot(n10) > threshold && n00.dot(n01) > threshold && n00.dot(n11) > threshold {
+                        // The surface is flat enough. Shade it all at once with interpolation.
+                        for iy in y..y+h {
+                            let v = (iy - y) as f32 / (h as f32).max(1.0);
+                            let offset = iy * frame.width;
+                            for ix in x..x+w {
+                                let u = (ix - x) as f32 / (w as f32).max(1.0);
+                                let brightness = b00 * (1.0 - u) * (1.0 - v) +
+                                                 b10 * u * (1.0 - v) +
+                                                 b01 * (1.0 - u) * v +
+                                                 b11 * u * v;
+                                frame.data[offset + ix] = rgb32(brightness, 0.0, 0.0);
+                            }
+                        }
+
+                        return;
+                    }
                 }
             }
 
