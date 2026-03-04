@@ -63,25 +63,47 @@ impl Image
 static mut EVAL_COUNT: u64 = 0;
 static mut TIME: f32 = 0.0;
 
-fn sd_torus(p: Vec3, tx: f32, ty: f32) -> f32
+fn sd_box(p: Vec3, b: Vec3) -> f32
 {
-    let qx: f32 = (p.x * p.x + p.z * p.z).sqrt() - tx;
-    return (qx*qx + p.y * p.y).sqrt() - ty;
+    let q = Vec3::new(p.x.abs(), p.y.abs(), p.z.abs()) - b;
+    return q.max(Vec3::new(0.0, 0.0, 0.0)).norm() + q.x.max(q.y.max(q.z)).min(0.0);
+}
+
+fn sd_cylinder_x(p: Vec3, r: f32) -> f32
+{
+    return (p.y * p.y + p.z * p.z).sqrt() - r;
+}
+
+fn sd_cylinder_y(p: Vec3, r: f32) -> f32
+{
+    return (p.x * p.x + p.z * p.z).sqrt() - r;
+}
+
+fn sd_cylinder_z(p: Vec3, r: f32) -> f32
+{
+    return (p.x * p.x + p.y * p.y).sqrt() - r;
 }
 
 fn sdf(p: Vec3) -> f32
 {
     unsafe { EVAL_COUNT += 1 };
 
-    // Generating rotation matrices here is inefficient
-    // since it only really needs to happen once per frame,
-    // but I wanted to keep the code simple
     let t = unsafe { TIME };
     let rot_x = Mat44::rotate_x(0.50 * t);
     let rot_z = Mat44::rotate_z(0.35 * t);
     let rot_p = (rot_x * rot_z).transform(p);
 
-    sd_torus(rot_p, 40.0, 20.0)
+    let d_box = sd_box(rot_p, Vec3::new(40.0, 40.0, 40.0));
+
+    let r = 25.0;
+    let c_x = sd_cylinder_x(rot_p, r);
+    let c_y = sd_cylinder_y(rot_p, r);
+    let c_z = sd_cylinder_z(rot_p, r);
+
+    let d_cyls = c_x.min(c_y.min(c_z));
+
+    // Subtraction: max(d1, -d2)
+    return d_box.max(-d_cyls);
 }
 
 // Estimate the surface normal with 4 SDF evaluations. Based
@@ -399,7 +421,7 @@ fn render_rect_approx(
         } else {
             // Too close, must recurse
             if w <= 10 && h <= 10 {
-                let t_test = t + d + 3.0 * radius;
+                let t_test = t + d + 2.5 * radius;
                 let p_test = cam_pos + ray_dir * t_test;
                 let d_test = sdf(p_test);
                 let radius_test = t_test * spread;
