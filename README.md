@@ -1,4 +1,4 @@
-# Adaptive Ray Batch Marching
+# Adaptive Ray Batch Marching (ARBM)
 
 
 
