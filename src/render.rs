@@ -253,6 +253,8 @@ fn shade_pixel(
     frame.set_pixel(x, y, brightness, 0.0, 0.0);
 }
 
+// Adaptive ray batch marching
+// (Ray marching with recursive image plane subdivision)
 fn render_rect(
     frame: &mut Image,
     cam_pos: Vec3,
@@ -344,6 +346,7 @@ fn render_rect(
     }
 }
 
+// ARBM + approximate/interpolated shading
 fn render_rect_approx(
     frame: &mut Image,
     cam_pos: Vec3,
