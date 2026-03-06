@@ -8,6 +8,8 @@ Press the numbers 1, 2, 3, 4 on your keyboard to toggle between 4 different raym
 3. Adaptive ray batch marching (ARBM)
 4. ARBM with approximate/interpolated shading
 
+Press the space bar to start/stop the rotation.
+
 ```
 cargo run --release
 ```
