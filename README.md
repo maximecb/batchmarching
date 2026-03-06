@@ -1,5 +1,9 @@
 # Adaptive Ray Batch Marching (ARBM)
 
+A recursive screen-space algorithm to render SDFs. This technique is most suitable for CPU rendering.
+
+There is prior work in [cone marching](https://www.fulcrum-demo.org/wp-content/uploads/2012/04/Cone_Marching_Mandelbox_by_Seven_Fulcrum_LongVersion.pdf) using multiple rendering passes on GPUs.
+
 ## Running the Demo
 
 Press the numbers 1, 2, 3, 4 on your keyboard to toggle between 4 different raymarching algorithms:
