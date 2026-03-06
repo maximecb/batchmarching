@@ -161,7 +161,7 @@ fn march_ray(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f32) -> f32
 // Returns a distance value
 // Infinity if no intersection
 // Accelerated sphere tracing algorithm (Balint & Valasek 2018)
-fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f32) -> f32
+fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, start_dist: f32, pixel_size_ratio: f32) -> f32
 {
     const MAX_STEPS: usize = 100;
     const MAX_DIST: f32 = 400.0;
@@ -170,7 +170,7 @@ fn march_ray_accel(cam_pos: Vec3, ray_dir: Vec3, pixel_size_ratio: f32) -> f32
     let w = 0.9;
 
     let mut r_m1 = 0.0;
-    let mut r_i = sdf(cam_pos);
+    let mut r_i = start_dist;
     let mut d_i = r_i;
     let mut t = 0.0;
     let mut num_steps = 0;
@@ -575,8 +575,13 @@ pub fn render_scene(
                     let ray_dir = (pix_pos - cam_pos).normalized();
 
                     let t = match method {
-                        RenderMethod::Standard => march_ray(cam_pos, ray_dir, pixel_size_ratio),
-                        RenderMethod::Accelerated => march_ray_accel(cam_pos, ray_dir, pixel_size_ratio),
+                        RenderMethod::Standard => {
+                            march_ray(cam_pos, ray_dir, pixel_size_ratio)
+                        }
+                        RenderMethod::Accelerated => {
+                            let start_dist = sdf(cam_pos);
+                            march_ray_accel(cam_pos, ray_dir, start_dist, pixel_size_ratio)
+                        }
                         _ => unreachable!(),
                     };
 
