@@ -2,6 +2,12 @@
 
 ## Running the Demo
 
+Press the numbers 1, 2, 3, 4 on your keyboard to toggle between 4 different raymarching algorithms:
+1. Standard ray marching
+2. Accelerated raymarching with over-relaxation (Balint & Valasek 2018)
+3. Adaptive ray batch marching (ARBM)
+4. ARBM with approximate/interpolated shading
+
 ```
 cargo run --release
 ```
