@@ -328,6 +328,7 @@ fn render_rect(
         // If d bounds the current quad, we can safely advance all rays in the quad
         if d > radius + epsilon {
             // Calculate how far we can safely advance the whole quad
+            // This uses a convervative linear bound
             let dt = (d - radius) / (1.0 + spread);
             t += dt.max(epsilon);
             num_steps += 1;
