@@ -95,11 +95,16 @@ fn main()
     let mut render_method = RenderMethod::Standard;
 
     let mut last_time = std::time::Instant::now();
+    let mut stopped = false;
 
     loop
     {
         let current_time = std::time::Instant::now();
-        let dt = current_time.duration_since(last_time).as_secs_f32();
+        let dt = if stopped {
+            0.0
+        } else {
+            current_time.duration_since(last_time).as_secs_f32()
+        };
         last_time = current_time;
 
         // See: https://docs.rs/sdl2/0.30.0/sdl2/event/enum.Event.htmls
@@ -128,6 +133,10 @@ fn main()
 
                     Keycode::Num4 => {
                         render_method = RenderMethod::Approx;
+                    }
+
+                    Keycode::Space => {
+                        stopped = !stopped;
                     }
 
                     _ => {}
