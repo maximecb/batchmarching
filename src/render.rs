@@ -294,8 +294,8 @@ fn render_rect(
     let dr = (dx*dx + dy*dy).sqrt();
     let spread = dr * pixel_size_ratio;
 
+    // In the single-pixel case, we do standard raymarching
     if w == 1 && h == 1 {
-        // Single pixel - march until hit or max dist
         let mut num_steps = 0;
         let epsilon_ratio = 0.5 * 1.414 * pixel_size_ratio;
 
@@ -325,7 +325,7 @@ fn render_rect(
         let epsilon = (t * pixel_size_ratio).max(EPSILON_BASE);
 
         if d > radius + epsilon {
-            // Safe to advance the whole quad
+            // Calculate how far we can safely advance the whole quad
             let dt = (d - radius) / (1.0 + spread);
             t += dt.max(epsilon);
             num_steps += 1;
