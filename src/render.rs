@@ -321,9 +321,11 @@ fn render_rect(
         let p = cam_pos + ray_dir * t;
         let d = sdf(p);
 
+        // Radius of the current quad of pixels at distance t
         let radius = t * spread;
         let epsilon = (t * pixel_size_ratio).max(EPSILON_BASE);
 
+        // If d bounds the current quad, we can safely advance all rays in the quad
         if d > radius + epsilon {
             // Calculate how far we can safely advance the whole quad
             let dt = (d - radius) / (1.0 + spread);
